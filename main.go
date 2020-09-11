@@ -94,7 +94,7 @@ func (rw *RecoveryResponseWriter) flush() error {
 			return err
 		}
 	}
-	rw.writes = nil
+	rw.writes = nil // clear writes buffer after response is sent
 	return nil
 }
 
