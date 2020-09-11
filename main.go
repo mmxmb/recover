@@ -4,16 +4,18 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"runtime/debug"
 )
 
 func main() {
 	dev := flag.Bool("dev", false, "")
 	flag.Parse()
-	rm := NewRecoverMiddleware(*dev)
+	rm := NewRecoveryMiddleware(*dev)
 	log.Fatal(http.ListenAndServe(":3000", rm))
 }
 
@@ -23,11 +25,12 @@ type Recovery struct {
 	rw  *RecoveryResponseWriter
 }
 
-func NewRecoverMiddleware(dev bool) *Recovery {
+func NewRecoveryMiddleware(dev bool) *Recovery {
 	rm := &Recovery{dev: dev}
 	rm.mux = http.NewServeMux()
 	rm.mux.HandleFunc("/panic/", panicDemo)
 	rm.mux.HandleFunc("/panic-after/", panicAfterDemo)
+	rm.mux.HandleFunc("/sourcecode/", sourcecodeHandler)
 	rm.mux.HandleFunc("/", hello)
 	rm.rw = &RecoveryResponseWriter{}
 	return rm
@@ -85,6 +88,9 @@ func (rw *RecoveryResponseWriter) Flush() {
 }
 
 func (rw *RecoveryResponseWriter) flush() error {
+	defer func() {
+		rw.writes = nil // clear writes buffer after response is sent
+	}()
 	if rw.status != 0 {
 		rw.ResponseWriter.WriteHeader(rw.status)
 	}
@@ -94,7 +100,6 @@ func (rw *RecoveryResponseWriter) flush() error {
 			return err
 		}
 	}
-	rw.writes = nil // clear writes buffer after response is sent
 	return nil
 }
 
@@ -105,6 +110,21 @@ func panicDemo(w http.ResponseWriter, r *http.Request) {
 func panicAfterDemo(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, "<h1>Hello!</h1>")
 	funcThatPanics()
+}
+
+func sourcecodeHandler(w http.ResponseWriter, r *http.Request) {
+	params := r.URL.Query()
+	filename := params.Get("path")
+	if len(filename) == 0 {
+		http.Error(w, "No path provided.", http.StatusBadRequest)
+		return
+	}
+	file, err := os.Open(filename)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
+	}
+	io.Copy(w, file)
 }
 
 func funcThatPanics() {
