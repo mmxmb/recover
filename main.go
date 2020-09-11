@@ -33,6 +33,7 @@ func (rm *RecoverMiddleware) recover(w http.ResponseWriter) {
 	if r := recover(); r != nil {
 		log.Printf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
 		if rm.dev {
+			w.WriteHeader(http.StatusInternalServerError)
 			fmt.Fprintf(w, "<h1>panic: %s</h1><pre>%s</pre>", r, string(debug.Stack()))
 		} else {
 			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
