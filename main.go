@@ -15,13 +15,13 @@ func main() {
 	log.Fatal(http.ListenAndServe(":3000", rm))
 }
 
-type RecoverMiddleware struct {
+type Recovery struct {
 	mux *http.ServeMux
 	dev bool
 }
 
-func NewRecoverMiddleware(dev bool) *RecoverMiddleware {
-	rm := &RecoverMiddleware{dev: dev}
+func NewRecoverMiddleware(dev bool) *Recovery {
+	rm := &Recovery{dev: dev}
 	rm.mux = http.NewServeMux()
 	rm.mux.HandleFunc("/panic/", panicDemo)
 	rm.mux.HandleFunc("/panic-after/", panicAfterDemo)
@@ -29,21 +29,21 @@ func NewRecoverMiddleware(dev bool) *RecoverMiddleware {
 	return rm
 }
 
-func (rm *RecoverMiddleware) recover(w http.ResponseWriter) {
-	if r := recover(); r != nil {
-		log.Printf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
-		if rm.dev {
+func (rec *Recovery) recover(w http.ResponseWriter) {
+	if err := recover(); err != nil {
+		log.Printf("panic: %s\nstacktrace: %s\n", err, string(debug.Stack()))
+		if rec.dev {
 			w.WriteHeader(http.StatusInternalServerError)
-			fmt.Fprintf(w, "<h1>panic: %s</h1><pre>%s</pre>", r, string(debug.Stack()))
+			fmt.Fprintf(w, "<h1>panic: %s</h1><pre>%s</pre>", err, string(debug.Stack()))
 		} else {
 			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
 		}
 	}
 }
 
-func (rm *RecoverMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	defer rm.recover(w)
-	h, _ := rm.mux.Handler(r)
+func (rec *Recovery) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	defer rec.recover(w)
+	h, _ := rec.mux.Handler(r)
 	h.ServeHTTP(w, r)
 }
 
