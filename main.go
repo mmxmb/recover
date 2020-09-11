@@ -31,9 +31,9 @@ func NewRecoverMiddleware(dev bool) *RecoverMiddleware {
 
 func (rm *RecoverMiddleware) recover(w http.ResponseWriter) {
 	if r := recover(); r != nil {
-		stacktrace := fmt.Sprintf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
+		log.Printf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
 		if rm.dev {
-			http.Error(w, stacktrace, http.StatusInternalServerError)
+			fmt.Fprintf(w, "<h1>panic: %s</h1><pre>%s</pre>", r, string(debug.Stack()))
 		} else {
 			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
 		}
