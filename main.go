@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,16 +9,19 @@ import (
 )
 
 func main() {
-	rm := NewRecoverMiddleware()
+	dev := flag.Bool("dev", false, "")
+	flag.Parse()
+	rm := NewRecoverMiddleware(*dev)
 	log.Fatal(http.ListenAndServe(":3000", rm))
 }
 
 type RecoverMiddleware struct {
 	mux *http.ServeMux
+	dev bool
 }
 
-func NewRecoverMiddleware() *RecoverMiddleware {
-	rm := &RecoverMiddleware{}
+func NewRecoverMiddleware(dev bool) *RecoverMiddleware {
+	rm := &RecoverMiddleware{dev: dev}
 	rm.mux = http.NewServeMux()
 	rm.mux.HandleFunc("/panic/", panicDemo)
 	rm.mux.HandleFunc("/panic-after/", panicAfterDemo)
@@ -27,9 +31,13 @@ func NewRecoverMiddleware() *RecoverMiddleware {
 
 func (rm *RecoverMiddleware) recover(w http.ResponseWriter) {
 	if r := recover(); r != nil {
-		log.Printf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
+		stacktrace := fmt.Sprintf("panic: %s\nstacktrace: %s\n", r, string(debug.Stack()))
+		if rm.dev {
+			http.Error(w, stacktrace, http.StatusInternalServerError)
+		} else {
+			http.Error(w, "Something went wrong...", http.StatusInternalServerError)
+		}
 	}
-	http.Error(w, "Something went wrong...", http.StatusInternalServerError)
 }
 
 func (rm *RecoverMiddleware) ServeHTTP(w http.ResponseWriter, r *http.Request) {
